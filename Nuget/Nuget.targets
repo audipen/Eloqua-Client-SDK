@@ -1,0 +1,29 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!--<PropertyGroup>
+    <PostBuildEvent>
+      copy /Y "$(OutDir)\Telerik.DataIntelligence.Client.dll" "$(ProjectDir)\lib"
+      $(SolutionDir)\.nuget\Nuget.exe pack $(ProjectDir)\Telerik.DataIntelligence.Client.nuspec
+    </PostBuildEvent>
+  </PropertyGroup>-->
+
+  <Target Name="PackageNuget">
+    <MakeDir Directories="$(OutDir)\Nuget\lib"/>
+    <Copy SourceFiles="$(OutDir)\Eloqua.Client.dll" DestinationFolder="$(OutDir)\Nuget\lib" SkipUnchangedFiles="true" />
+
+    <Exec Command="$(SolutionDir)\.nuget\Nuget.exe spec -NonInteractive -Verbosity detailed -AssemblyPath $(OutDir)\Eloqua.Client.dll" />
+    <Exec Command="$(SolutionDir)\.nuget\Nuget.exe pack Eloqua.Client.nuspec -NonInteractive -OutputDirectory $(OutDir) -BasePath $(OutDir)\Nuget" />
+  </Target>
+
+  <Target Name="CleanNuget">
+    <RemoveDir Directories="$(OutDir)\Nuget\bin" Condition="Exists('$(OutDir)\Nuget\bin')" />
+    <RemoveDir Directories="$(OutDir)\Nuget" Condition="Exists('$(OutDir)\Nuget')" />
+    <Delete Files="$(OutDir)\Eloqua.Client.nuget" />
+  </Target>
+
+  <PropertyGroup>
+    <BuildDependsOn>$(BuildDependsOn);PackageNuget</BuildDependsOn>
+    <CleanDependsOn>CleanNuget;$(CleanDependsOn)</CleanDependsOn>
+  </PropertyGroup>
+
+</Project>
