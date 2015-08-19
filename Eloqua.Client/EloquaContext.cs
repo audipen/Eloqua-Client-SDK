@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
+using Eloqua.Client.Model;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -14,9 +15,9 @@ namespace Eloqua.Client
         private readonly string password;
         private readonly string companyId;
         private string authenticationToken;
-        private List<Contact> objectToAdd = new List<Contact>();
-        private List<Contact> objectsToUpdate = new List<Contact>();
-        private List<string> objectsToDelete = new List<string>();
+        private readonly List<Item> objectToAdd = new List<Item>();
+        private readonly List<Item> objectsToUpdate = new List<Item>();
+        private readonly List<string> objectsToDelete = new List<string>();
 
         private string restApiUrl;
 
@@ -27,7 +28,12 @@ namespace Eloqua.Client
             this.companyId = companyId;
         }
 
-        public void Update(Contact contact)
+        public void Add<T>(T contact) where T : Item
+        {
+            this.objectToAdd.Add(contact);
+        }
+
+        public void Update<T>(T contact) where T : Item
         {
             this.objectsToUpdate.Add(contact);
         }
@@ -65,7 +71,7 @@ namespace Eloqua.Client
             {
                 contactClient.BaseAddress = new Uri(restApiUrl);
                 contactClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", this.authenticationToken);
-                //contactClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json")); 
+                
                 for (int i = 0; i < this.objectToAdd.Count; i++)
                 {
                     var content = new StringContent(JsonConvert.SerializeObject(this.objectToAdd[i]), Encoding.UTF8, "application/json");
@@ -75,8 +81,8 @@ namespace Eloqua.Client
                         throw new Exception(contactPostResponse.Content.ReadAsStringAsync().Result);
                     }
 
-                    var contact = JsonConvert.DeserializeAnonymousType(contactPostResponse.Content.ReadAsStringAsync().Result, new Contact());
-                    this.objectToAdd[i].Id = contact.Id;
+                    var response = (JObject)JsonConvert.DeserializeObject(contactPostResponse.Content.ReadAsStringAsync().Result);
+                    this.objectToAdd[i].Id = response["id"].Value<string>();
                 }
                 this.objectToAdd.Clear();
 
@@ -88,15 +94,11 @@ namespace Eloqua.Client
                     {
                         throw new Exception(contactPostResponse.Content.ReadAsStringAsync().Result);
                     }
-
-                    //var contact = JsonConvert.DeserializeAnonymousType(contactPostResponse.Content.ReadAsStringAsync().Result, new Contact());
-                    //this.objectToAdd[i].Id = contact.Id;
                 }
                 this.objectsToUpdate.Clear();
 
                 for (int i = 0; i < this.objectsToDelete.Count; i++)
                 {
-                    //var content = new StringContent(JsonConvert.SerializeObject(this.objectToAdd[i]), Encoding.UTF8, "application/json");
                     var contactPostResponse = contactClient.DeleteAsync("data/contact/" + this.objectsToDelete[i]).Result;
                     if (contactPostResponse.IsSuccessStatusCode == false)
                     {
@@ -107,10 +109,7 @@ namespace Eloqua.Client
             }
         }
 
-        public void Add(Contact contact)
-        {
-            this.objectToAdd.Add(contact);
-        }
+        
 
         public List<object> GetContacts()
         {
@@ -138,20 +137,5 @@ namespace Eloqua.Client
             return Convert.ToBase64String(Encoding.UTF8.GetBytes(token));
         }
 
-    }
-
-    public class Contact
-    {
-        [JsonProperty("id")]
-        public string Id { get; set; }
-
-        [JsonProperty("emailAddress")]
-        public string EmailAddress { get; set; }
-
-        [JsonProperty("businessPhone")]
-        public string BusinessPhone { get; set; }
-
-        [JsonProperty("firstName")]
-        public string FirstName { get; set; }
     }
 }
