@@ -38,30 +38,9 @@ namespace Eloqua.Client
             this.objectsToUpdate.Add(contact);
         }
 
-        public void Delete(string idInsertedInSource)
+        public void Delete(string id)
         {
-            this.objectsToDelete.Add(idInsertedInSource);
-        }
-
-        private void GetBaseUrl()
-        {
-            if (this.restApiUrl == null)
-            {
-                this.authenticationToken = GetAuthenticationToken();
-                using (HttpClient client = new HttpClient())
-                {
-                    client.BaseAddress = new Uri("https://login.eloqua.com/");
-                    client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", this.authenticationToken);
-                    var response = client.GetAsync("id").Result;
-                    if (response.IsSuccessStatusCode)
-                    {
-                        var resContent = response.Content.ReadAsStringAsync().Result;
-                        var jObject = JObject.Parse(resContent);
-                        string restApiUrl = jObject["urls"]["apis"]["rest"]["standard"].Value<string>();
-                        this.restApiUrl = restApiUrl.Replace("{version}", "1.0");
-                    }
-                }
-            }
+            this.objectsToDelete.Add(id);
         }
 
         public void SaveChanges()
@@ -71,7 +50,7 @@ namespace Eloqua.Client
             {
                 contactClient.BaseAddress = new Uri(restApiUrl);
                 contactClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", this.authenticationToken);
-                
+
                 for (int i = 0; i < this.objectToAdd.Count; i++)
                 {
                     var content = new StringContent(JsonConvert.SerializeObject(this.objectToAdd[i]), Encoding.UTF8, "application/json");
@@ -109,26 +88,55 @@ namespace Eloqua.Client
             }
         }
 
-        
-
-        public List<object> GetContacts()
+        public IEnumerable<T> GetAll<T>() where T : Item, new()
         {
             GetBaseUrl();
-            using (HttpClient contactClient = new HttpClient())
+            using (HttpClient client = new HttpClient())
             {
-                contactClient.BaseAddress = new Uri(restApiUrl);
-                contactClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", this.authenticationToken);
-                var contactGetResponse = contactClient.GetAsync("data/contacts").Result;
-                if (contactGetResponse.IsSuccessStatusCode)
+                client.BaseAddress = new Uri(restApiUrl);
+                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", this.authenticationToken);
+                //TODO: parameterize depth parameter
+                var getResponse = client.GetAsync(string.Format("data/{0}?depth={1}",GetEndpoint(typeof(T)),"partial")).Result;
+                if (getResponse.IsSuccessStatusCode)
                 {
-                    var contact = new { elements = new[] { new { name = "", emailAddress = "" } } };
-                    var contacts = JsonConvert.DeserializeAnonymousType(contactGetResponse.Content.ReadAsStringAsync().Result, contact);
+                    var temp = new { elements = new[] { new T() } };
+                    var objects = JsonConvert.DeserializeAnonymousType(getResponse.Content.ReadAsStringAsync().Result, temp);
 
-                    return contacts.elements.Cast<object>().ToList();
+                    return objects.elements;
+                }
+
+                throw new Exception(getResponse.Content.ReadAsStringAsync().Result);
+            }
+        }
+ 
+        //TODO : Replace this with attribute implementation
+        private string GetEndpoint(Type requestedType)
+        {
+            if (typeof(Contact).Equals(requestedType))
+                return "contacts";
+
+            throw new ArgumentOutOfRangeException(requestedType.FullName);
+        }
+
+        private void GetBaseUrl()
+        {
+            if (this.restApiUrl == null)
+            {
+                this.authenticationToken = GetAuthenticationToken();
+                using (HttpClient client = new HttpClient())
+                {
+                    client.BaseAddress = new Uri("https://login.eloqua.com/");
+                    client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", this.authenticationToken);
+                    var response = client.GetAsync("id").Result;
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var resContent = response.Content.ReadAsStringAsync().Result;
+                        var jObject = JObject.Parse(resContent);
+                        string restApiUrl = jObject["urls"]["apis"]["rest"]["standard"].Value<string>();
+                        this.restApiUrl = restApiUrl.Replace("{version}", "1.0");
+                    }
                 }
             }
-
-            return new List<object>();
         }
 
         private string GetAuthenticationToken()

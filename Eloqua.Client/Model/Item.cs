@@ -8,5 +8,6 @@ namespace Eloqua.Client.Model
     {
         [JsonProperty("id")]
         public string Id { get; internal set; }
+    
     }
 }
